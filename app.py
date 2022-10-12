@@ -5,7 +5,7 @@ from flask_debugtoolbar import DebugToolbarExtension
 from sqlalchemy.exc import IntegrityError
 
 from forms import UserAddForm, LoginForm, MessageForm
-from models import db, connect_db, User, Message
+from models import Likes, db, connect_db, User, Message
 from flask_bcrypt import Bcrypt
 
 bcrypt = Bcrypt()
@@ -239,14 +239,15 @@ def profile():
         form.location.data = user.location
         if form.validate_on_submit():
             if bcrypt.check_password_hash(user.password, form.password.data):
+                #form.populate_obj(user)
                 user.username = form.username.data
                 user.email = form.email.data
                 user.image_url = form.image_url.data
                 user.header_image_url = form.header_image_url.data
                 user.bio =form.bio.data
                 user.location = form.location.data
-                print("+++++++++++++++++++++++++")
-                print(user.bio, form.bio.data, user.location, form.location.data)
+                #print("+++++++++++++++++++++++++")
+                #print(user.bio, form.bio.data, user.location, form.location.data)
                 db.session.add(user)
                 db.session.commit()
                 return redirect(f"/users/{g.user.id}")	
@@ -254,7 +255,7 @@ def profile():
             print ("*******************************")
             print(bcrypt.check_password_hash())
             return redirect('/login')
-        return render_template('/users/edit.html', form=form)	
+        return render_template('/users/edit.html', form=form,user = g.user.id)	
 
 
 @app.route('/users/delete', methods=["POST"])
@@ -363,3 +364,31 @@ def add_header(req):
     req.headers["Expires"] = "0"
     req.headers['Cache-Control'] = 'public, max-age=0'
     return req
+
+
+##############################################################################
+# Like or Unlike a message
+
+
+@app.route('/users/add_like/<int:message_id>', methods=["POST"])
+def like_messages(message_id):
+    """Like a message."""
+
+    if not g.user:
+        flash("Access unauthorized.", "danger")
+        return redirect("/")
+
+    msg_likes = Likes.query.filter( Likes.message_id == message_id, Likes.user_id == g.user.id).first()
+    msg = Message.query.get(message_id)
+    print (msg)
+    if msg.user_id == g.user.id:
+        flash("You cannot like your messages.", "danger")
+        return redirect('/')
+    if msg_likes is not None:
+        db.session.delete(msg_likes)
+    else:
+        msg_like = Likes(user_id = g.user.id,message_id=message_id)
+        db.session.add(msg_like)    
+    db.session.commit()
+
+    return redirect(f"/users/{g.user.id}")
